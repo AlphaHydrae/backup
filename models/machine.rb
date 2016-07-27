@@ -9,6 +9,10 @@ require 'shellwords'
 
 Dotenv.load!
 
+%i(GPG_KEY AWS_REGION AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY).each do |name|
+  raise "$BACKUP_MACHINE_#{name} must be set!" unless ENV["BACKUP_MACHINE_#{name}"]
+end
+
 BACKUP_TMP_DIR = Dir.mktmpdir
 BACKUP_MACPORTS_BIN = '/opt/local/bin/port'
 BACKUP_HOMEBREW_BIN = '/usr/local/bin/brew'
@@ -27,7 +31,7 @@ preconfigure 'MachineModel' do
 
   encrypt_with GPG do |encryption|
 
-    key_name = ENV['BACKUP_MACHINE_GPG_KEY_NAME']
+    key_name = ENV['BACKUP_MACHINE_GPG_KEY']
 
     encryption.keys = {}
     encryption.keys[key_name] = `gpg --export --armor #{Shellwords.shellescape(key_name)}`
@@ -99,8 +103,17 @@ MachineModel.new(:machine, 'Backup of the local machine\'s configuration') do
     end
   end
 
+  store_with S3 do |s3|
+    s3.access_key_id = ENV['BACKUP_MACHINE_AWS_ACCESS_KEY_ID']
+    s3.secret_access_key = ENV['BACKUP_MACHINE_AWS_SECRET_ACCESS_KEY']
+    s3.region = ENV['BACKUP_MACHINE_AWS_REGION']
+    s3.bucket = ENV['BACKUP_MACHINE_AWS_BUCKET']
+    s3.path = ''
+    s3.chunk_size = 10
+  end
+
   store_with Local do |local|
     local.path = '~/Backup/local'
-    local.keep = 5
+    local.keep = 120
   end
 end
