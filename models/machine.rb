@@ -17,8 +17,8 @@ BACKUP_TMP_DIR = Dir.mktmpdir
 BACKUP_MACPORTS_BIN = '/opt/local/bin/port'
 BACKUP_HOMEBREW_BIN = '/usr/local/bin/brew'
 
-BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Machines Projects Projects/ansible-roles)
-BACKUP_MACHINE_CONFIGURATION_FILES = %w(.httpie/config.json .zshconfig)
+BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects Projects/ansible-roles)
+BACKUP_MACHINE_CONFIGURATION_FILES = %w(.gnupg/gpg.conf .httpie/config.json .zshconfig)
 
 Signal.trap 'EXIT' do
   FileUtils.remove_entry_secure BACKUP_TMP_DIR
@@ -108,7 +108,7 @@ MachineModel.new(:machine, 'Backup of the local machine\'s configuration') do
     s3.secret_access_key = ENV['BACKUP_MACHINE_AWS_SECRET_ACCESS_KEY']
     s3.region = ENV['BACKUP_MACHINE_AWS_REGION']
     s3.bucket = ENV['BACKUP_MACHINE_AWS_BUCKET']
-    s3.path = ''
+    s3.path = 'backup'
     s3.chunk_size = 10
   end
 
