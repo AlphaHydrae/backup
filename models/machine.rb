@@ -13,12 +13,18 @@ Dotenv.load!
   raise "$BACKUP_MACHINE_#{name} must be set!" unless ENV["BACKUP_MACHINE_#{name}"]
 end
 
+%i(PATH).each do |name|
+  raise "$BACKUP_DOCUMENTS_#{name} must be set!" unless ENV["BACKUP_DOCUMENTS_#{name}"]
+end
+
 BACKUP_TMP_DIR = Dir.mktmpdir
 BACKUP_MACPORTS_BIN = '/opt/local/bin/port'
 BACKUP_HOMEBREW_BIN = '/usr/local/bin/brew'
 
 BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects Projects/ansible-roles)
 BACKUP_MACHINE_CONFIGURATION_FILES = %w(.gnupg/gpg.conf .httpie/config.json .zshconfig)
+
+BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Documents Playground Projects Servers)
 
 Signal.trap 'EXIT' do
   FileUtils.remove_entry_secure BACKUP_TMP_DIR
@@ -38,9 +44,39 @@ preconfigure 'MachineModel' do
 
     encryption.recipients = key_name
   end
+
+  store_with S3 do |s3|
+    s3.access_key_id = ENV['BACKUP_MACHINE_AWS_ACCESS_KEY_ID']
+    s3.secret_access_key = ENV['BACKUP_MACHINE_AWS_SECRET_ACCESS_KEY']
+    s3.region = ENV['BACKUP_MACHINE_AWS_REGION']
+    s3.bucket = ENV['BACKUP_MACHINE_AWS_BUCKET']
+    s3.path = 'backup'
+    s3.chunk_size = 10
+  end
 end
 
-MachineModel.new(:machine, 'Backup of the local machine\'s configuration') do
+MachineModel.new :documents, 'Backup of documents' do
+  archive :documents do |archive|
+    archive.root ENV['BACKUP_DOCUMENTS_PATH']
+    BACKUP_DOCUMENTS_DIRECTORIES.each do |dir|
+      archive.add dir
+    end
+  end
+
+  store_with Local do |local|
+    local.path = '~/Backup/local'
+    local.keep = 3
+  end
+end
+
+MachineModel.new :vault, 'Backup of archives' do
+  archive :vault do |archive|
+    archive.root ENV['BACKUP_DOCUMENTS_PATH']
+    archive.add 'Vault'
+  end
+end
+
+MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
 
   before do
 
@@ -101,15 +137,6 @@ MachineModel.new(:machine, 'Backup of the local machine\'s configuration') do
         archive.add file
       end
     end
-  end
-
-  store_with S3 do |s3|
-    s3.access_key_id = ENV['BACKUP_MACHINE_AWS_ACCESS_KEY_ID']
-    s3.secret_access_key = ENV['BACKUP_MACHINE_AWS_SECRET_ACCESS_KEY']
-    s3.region = ENV['BACKUP_MACHINE_AWS_REGION']
-    s3.bucket = ENV['BACKUP_MACHINE_AWS_BUCKET']
-    s3.path = 'backup'
-    s3.chunk_size = 10
   end
 
   store_with Local do |local|
