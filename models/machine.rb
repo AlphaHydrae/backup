@@ -22,7 +22,7 @@ BACKUP_MACPORTS_BIN = '/opt/local/bin/port'
 BACKUP_HOMEBREW_BIN = '/usr/local/bin/brew'
 
 BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects Projects/ansible-roles)
-BACKUP_MACHINE_CONFIGURATION_FILES = %w(.gnupg/gpg.conf .httpie/config.json .zshconfig)
+BACKUP_MACHINE_CONFIGURATION_FILES = %w(.bash_profile .gnupg/gpg.conf .httpie/config.json .zshconfig)
 
 BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Documents Playground Projects Servers)
 
