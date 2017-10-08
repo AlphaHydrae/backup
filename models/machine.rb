@@ -14,6 +14,10 @@ Dotenv.load!
 end
 
 %i(PATH).each do |name|
+  raise "$BACKUP_DATA_#{name} must be set!" unless ENV["BACKUP_DATA_#{name}"]
+end
+
+%i(PATH).each do |name|
   raise "$BACKUP_DOCUMENTS_#{name} must be set!" unless ENV["BACKUP_DOCUMENTS_#{name}"]
 end
 
@@ -24,6 +28,7 @@ BACKUP_HOMEBREW_BIN = '/usr/local/bin/brew'
 BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects Projects/ansible-roles)
 BACKUP_MACHINE_CONFIGURATION_FILES = %w(.bash_profile .gnupg/gpg.conf .httpie/config.json .zshconfig)
 
+BACKUP_DATA_DIRECTORIES = %w(Documents Vault Work)
 BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Documents Playground Projects Servers)
 
 Signal.trap 'EXIT' do
@@ -52,6 +57,15 @@ preconfigure 'MachineModel' do
     s3.bucket = ENV['BACKUP_MACHINE_AWS_BUCKET']
     s3.path = 'backup'
     s3.chunk_size = 10
+  end
+end
+
+MachineModel.new :data, 'Backup of data' do
+  archive :data do |archive|
+    archive.root ENV['BACKUP_DATA_PATH']
+    BACKUP_DATA_DIRECTORIES.each do |dir|
+      archive.add dir
+    end
   end
 end
 
