@@ -25,11 +25,11 @@ BACKUP_TMP_DIR = Dir.mktmpdir
 BACKUP_MACPORTS_BIN = '/opt/local/bin/port'
 BACKUP_HOMEBREW_BIN = '/usr/local/bin/brew'
 
-BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects Projects/ansible-roles)
+BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects)
 BACKUP_MACHINE_CONFIGURATION_FILES = %w(.bash_profile .gnupg/gpg.conf .httpie/config.json .zshconfig)
 
 BACKUP_DATA_DIRECTORIES = %w(Documents Vault Work)
-BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Documents Playground Projects Servers)
+BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Config Documents Playground Projects Servers)
 
 Signal.trap 'EXIT' do
   FileUtils.remove_entry_secure BACKUP_TMP_DIR
