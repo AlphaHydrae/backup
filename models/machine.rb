@@ -92,6 +92,7 @@ end
 
 MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
 
+  # TODO: list gems, list npm packages
   before do
 
     installation_dir = File.join BACKUP_TMP_DIR, 'installation'
