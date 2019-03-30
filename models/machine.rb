@@ -110,7 +110,9 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
 
     if File.executable? BACKUP_HOMEBREW_BIN
       list_path = File.join installation_dir, 'homebrew.txt'
+      cask_list_path = File.join installation_dir, 'homebrew-cask.txt'
       system "#{BACKUP_HOMEBREW_BIN} list --versions > #{Shellwords.shellescape(list_path)}"
+      system "#{BACKUP_HOMEBREW_BIN} cask list --versions > #{Shellwords.shellescape(cask_list_path)}"
     end
   end
 
