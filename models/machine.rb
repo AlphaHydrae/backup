@@ -139,7 +139,7 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
 
     BACKUP_MACHINE_CONFIGURATION_FILES.each do |file|
       absolute_path = File.expand_path file, '~'
-      archive.add absolute_path
+      archive.add absolute_path if File.exist? absolute_path
     end
   end
 
