@@ -5,7 +5,10 @@
 #
 
 require 'dotenv'
+require 'mkmf'
+require 'paint'
 require 'shellwords'
+require 'which_works'
 
 Dotenv.load!
 
@@ -22,13 +25,11 @@ end
 end
 
 BACKUP_TMP_DIR = Dir.mktmpdir
-BACKUP_MACPORTS_BIN = '/opt/local/bin/port'
-BACKUP_HOMEBREW_BIN = '/usr/local/bin/brew'
 
 BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects)
 BACKUP_MACHINE_CONFIGURATION_FILES = %w(/etc/hosts .bash_profile .gitlocal .gitprivate .gnupg/gpg.conf .gnupg/gpg-agent.conf .httpie/config.json .zshconfig)
 
-BACKUP_DATA_DIRECTORIES = %w(Documents Vault Work)
+BACKUP_DATA_DIRECTORIES = %w(Documents Scans Vault Work)
 BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Config Documents Playground Projects Servers)
 
 Signal.trap 'EXIT' do
@@ -50,13 +51,15 @@ preconfigure 'MachineModel' do
     encryption.recipients = key_name
   end
 
-  store_with S3 do |s3|
-    s3.access_key_id = ENV['BACKUP_MACHINE_AWS_ACCESS_KEY_ID']
-    s3.secret_access_key = ENV['BACKUP_MACHINE_AWS_SECRET_ACCESS_KEY']
-    s3.region = ENV['BACKUP_MACHINE_AWS_REGION']
-    s3.bucket = ENV['BACKUP_MACHINE_AWS_BUCKET']
-    s3.path = 'backup'
-    s3.chunk_size = 10
+  unless ENV['BACKUP_LOCAL_ONLY']
+    store_with S3 do |s3|
+      s3.access_key_id = ENV['BACKUP_MACHINE_AWS_ACCESS_KEY_ID']
+      s3.secret_access_key = ENV['BACKUP_MACHINE_AWS_SECRET_ACCESS_KEY']
+      s3.region = ENV['BACKUP_MACHINE_AWS_REGION']
+      s3.bucket = ENV['BACKUP_MACHINE_AWS_BUCKET']
+      s3.path = 'backup'
+      s3.chunk_size = 10
+    end
   end
 end
 
@@ -92,7 +95,6 @@ end
 
 MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
 
-  # TODO: list gems, list npm packages
   before do
 
     installation_dir = File.join BACKUP_TMP_DIR, 'installation'
@@ -101,37 +103,69 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
     BACKUP_MACHINE_LISTED_DIRECTORIES.each do |dir|
       absolute_path = File.expand_path dir, '~'
       list_path = File.join installation_dir, "#{File.basename(dir)}.txt"
-      system "ls #{Shellwords.shellescape(absolute_path)} > #{Shellwords.shellescape(list_path)}"
+      if not File.directory? absolute_path
+        Logger.info Paint[%/Directory "#{absolute_path}" does not exist, skipping.../, :cyan]
+      elsif not system "ls #{Shellwords.shellescape(absolute_path)} > #{Shellwords.shellescape(list_path)}"
+        raise "Could not list directory #{dir}"
+      end
     end
 
-    if File.executable? BACKUP_MACPORTS_BIN
+    if Which.which 'port'
       list_path = File.join installation_dir, 'macports.txt'
-      system "#{BACKUP_MACPORTS_BIN} installed > #{Shellwords.shellescape(list_path)}"
+      if not system "port installed > #{Shellwords.shellescape(list_path)}"
+        raise 'Could not list installed ports'
+      end
+    else
+      Logger.info Paint['MacPorts not available, skipping...', :cyan]
     end
 
-    if File.executable? BACKUP_HOMEBREW_BIN
+    if Which.which 'brew'
+
       list_path = File.join installation_dir, 'homebrew.txt'
+      if not system "brew list --versions > #{Shellwords.shellescape(list_path)}"
+        raise 'Could not list installed packages with Homebrew'
+      end
+
       cask_list_path = File.join installation_dir, 'homebrew-cask.txt'
-      system "#{BACKUP_HOMEBREW_BIN} list --versions > #{Shellwords.shellescape(list_path)}"
-      system "#{BACKUP_HOMEBREW_BIN} cask list --versions > #{Shellwords.shellescape(cask_list_path)}"
+      if not system "brew cask list --versions > #{Shellwords.shellescape(cask_list_path)}"
+        raise 'Could not list installed casks with Homebrew'
+      end
+    else
+      Logger.info Paint['Homebrew not available, skipping...', :cyan]
+    end
+
+    if Which.which 'gem'
+      gems_path = File.join installation_dir, 'gems.txt'
+      if not system "gem list > #{Shellwords.shellescape(gems_path)}"
+        raise 'Could not list installed Ruby gems'
+      end
+    else
+      Logger.info Paint['gem executable not available, skipping...', :cyan]
+    end
+
+    if Which.which 'npm'
+      npm_packages_path = File.join installation_dir, 'npm.txt'
+      if not system "npm list --global --depth 0 > #{Shellwords.shellescape(npm_packages_path)}"
+        raise 'Could not list installed npm packages'
+      end
+    else
+      Logger.info Paint['npm executable not available, skipping...', :cyan]
     end
   end
 
   archive :installation do |archive|
-
     archive.root File.join(BACKUP_TMP_DIR, 'installation')
-    BACKUP_MACHINE_LISTED_DIRECTORIES.each do |dir|
-      archive.add "#{File.basename(dir)}.txt"
-    end
-
-    archive.add 'macports.txt' if File.executable? BACKUP_MACPORTS_BIN
-    archive.add 'homebrew.txt' if File.executable? BACKUP_HOMEBREW_BIN
+    archive.add '.'
   end
 
   archive :configuration do |archive|
 
     homebrew_configuration_files = '/usr/local/etc'
-    archive.add homebrew_configuration_files if File.directory? homebrew_configuration_files
+    if File.directory? homebrew_configuration_files
+      archive.add homebrew_configuration_files
+    else
+      Logger.info Paint[%/Homebrew configuration directory "#{homebrew_configuration_files}" not available, skipping.../, :cyan]
+    end
 
     Dir.glob('/usr/local/var/postgres/*.conf').each do |file|
       archive.add file
@@ -139,7 +173,11 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
 
     BACKUP_MACHINE_CONFIGURATION_FILES.each do |file|
       absolute_path = File.expand_path file, '~'
-      archive.add absolute_path if File.exist? absolute_path
+      if File.exist? absolute_path
+        archive.add absolute_path
+      else
+        Logger.info Paint[%/File "#{absolute_path}" does not exist, skipping.../, :cyan]
+      end
     end
   end
 
