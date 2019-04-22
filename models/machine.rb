@@ -145,7 +145,8 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
 
     if Which.which 'npm'
       npm_packages_path = File.join installation_dir, 'npm.txt'
-      if not system "npm list --global --depth 0 > #{Shellwords.shellescape(npm_packages_path)}"
+      # Note: npm list returns a non-zero status code if peer dependencies are not met
+      if not system "npm list --global --depth 0 > #{Shellwords.shellescape(npm_packages_path)} || true"
         raise 'Could not list installed npm packages'
       end
     else
