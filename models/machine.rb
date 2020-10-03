@@ -26,8 +26,8 @@ end
 
 BACKUP_TMP_DIR = Dir.mktmpdir
 
-BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Machines Projects)
-BACKUP_MACHINE_CONFIGURATION_FILES = %w(/etc/hosts .bash_profile .gitlocal .gitprivate .gnupg/gpg.conf .gnupg/gpg-agent.conf .httpie/config.json .zshconfig)
+BACKUP_MACHINE_LISTED_DIRECTORIES = %w(/Applications /Applications/Utilities Downloads Library/LaunchAgents Projects)
+BACKUP_MACHINE_CONFIGURATION_FILES = %w(/etc/hosts .bash_profile .gitlocal .gitprivate .gnupg/gpg.conf .gnupg/gpg-agent.conf .httpie/config.json .tool-versions .zshconfig)
 
 BACKUP_DATA_DIRECTORIES = %w(Documents Scans Work)
 BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Config Documents Playground Projects Servers)
