@@ -32,6 +32,33 @@ BACKUP_MACHINE_CONFIGURATION_FILES = %w(/etc/hosts .bash_profile .gitlocal .gitp
 BACKUP_DATA_DIRECTORIES = %w(Documents Scans Work)
 BACKUP_DOCUMENTS_DIRECTORIES = %w(Archives Automator Config Documents Playground Projects Servers)
 
+class CustomBackup
+  def self.archive_path(archive:, path:, name: nil)
+    absolute_path = File.expand_path(path, '~')
+    if File.file? absolute_path
+      archive.add absolute_path
+      Logger.info "Archived #{Paint[absolute_path, :green]}"
+    else
+      Logger.info Paint["#{name || 'File or directory'} '#{absolute_path}' not available, skipping...", :cyan]
+    end
+  end
+
+  def self.back_up_command_output(command:, backup_dir:, backup_relative_path: nil)
+    executable = command.first
+    if Which.which executable
+      escaped_command = command.map{ |word| Shellwords.shellescape word }.join(' ')
+      escaped_absolute_path = Shellwords.shellescape(File.join(backup_dir, backup_relative_path || "#{executable}.txt"))
+      if not system "#{escaped_command} > #{escaped_absolute_path}"
+        raise "Failed to execute #{escaped_command} > #{escaped_absolute_path}"
+      else
+        Logger.info "#{Paint[escaped_command, :yellow]} -> #{Paint[escaped_absolute_path, :green]}"
+      end
+    else
+      Logger.info Paint["Command '#{executable}' not available, skipping...", :cyan]
+    end
+  end
+end
+
 Signal.trap 'EXIT' do
   FileUtils.remove_entry_secure BACKUP_TMP_DIR
 end
@@ -101,57 +128,13 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
     FileUtils.mkdir_p installation_dir
 
     BACKUP_MACHINE_LISTED_DIRECTORIES.each do |dir|
-      absolute_path = File.expand_path dir, '~'
-      list_path = File.join installation_dir, "#{File.basename(dir)}.txt"
-      if not File.directory? absolute_path
-        Logger.info Paint[%/Directory "#{absolute_path}" does not exist, skipping.../, :cyan]
-      elsif not system "ls #{Shellwords.shellescape(absolute_path)} > #{Shellwords.shellescape(list_path)}"
-        raise "Could not list directory #{dir}"
-      end
+      absolute_dir_path = File.expand_path dir, '~'
+      CustomBackup.back_up_command_output(command: [ 'ls', absolute_dir_path ], backup_dir: installation_dir, backup_relative_path: "#{File.basename(dir)}.txt")
     end
 
-    if Which.which 'port'
-      list_path = File.join installation_dir, 'macports.txt'
-      if not system "port installed > #{Shellwords.shellescape(list_path)}"
-        raise 'Could not list installed ports'
-      end
-    else
-      Logger.info Paint['MacPorts not available, skipping...', :cyan]
-    end
-
-    if Which.which 'brew'
-
-      list_path = File.join installation_dir, 'homebrew.txt'
-      if not system "brew list --versions > #{Shellwords.shellescape(list_path)}"
-        raise 'Could not list installed packages with Homebrew'
-      end
-
-      cask_list_path = File.join installation_dir, 'homebrew-cask.txt'
-      if not system "brew cask list --versions > #{Shellwords.shellescape(cask_list_path)}"
-        raise 'Could not list installed casks with Homebrew'
-      end
-    else
-      Logger.info Paint['Homebrew not available, skipping...', :cyan]
-    end
-
-    if Which.which 'gem'
-      gems_path = File.join installation_dir, 'gems.txt'
-      if not system "gem list > #{Shellwords.shellescape(gems_path)}"
-        raise 'Could not list installed Ruby gems'
-      end
-    else
-      Logger.info Paint['gem executable not available, skipping...', :cyan]
-    end
-
-    if Which.which 'npm'
-      npm_packages_path = File.join installation_dir, 'npm.txt'
-      # Note: npm list returns a non-zero status code if peer dependencies are not met
-      if not system "npm list --global --depth 0 > #{Shellwords.shellescape(npm_packages_path)} || true"
-        raise 'Could not list installed npm packages'
-      end
-    else
-      Logger.info Paint['npm executable not available, skipping...', :cyan]
-    end
+    CustomBackup.back_up_command_output(command: [ 'brew', 'list', '--versions' ], backup_dir: installation_dir)
+    CustomBackup.back_up_command_output(command: [ 'gem', 'list' ], backup_dir: installation_dir)
+    CustomBackup.back_up_command_output(command: [ 'npm', 'list', '--global', '--depth', '0' ], backup_dir: installation_dir)
   end
 
   archive :installation do |archive|
@@ -160,25 +143,14 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
   end
 
   archive :configuration do |archive|
-
-    homebrew_configuration_files = '/usr/local/etc'
-    if File.directory? homebrew_configuration_files
-      archive.add homebrew_configuration_files
-    else
-      Logger.info Paint[%/Homebrew configuration directory "#{homebrew_configuration_files}" not available, skipping.../, :cyan]
-    end
+    CustomBackup.archive_path(archive: archive, path: '/usr/local/etc', name: 'Homebrew configuration directory')
 
     Dir.glob('/usr/local/var/postgres/*.conf').each do |file|
-      archive.add file
+      CustomBackup.archive_path(archive: archive, path: file)
     end
 
     BACKUP_MACHINE_CONFIGURATION_FILES.each do |file|
-      absolute_path = File.expand_path file, '~'
-      if File.exist? absolute_path
-        archive.add absolute_path
-      else
-        Logger.info Paint[%/File "#{absolute_path}" does not exist, skipping.../, :cyan]
-      end
+      CustomBackup.archive_path(archive: archive, path: file)
     end
   end
 
@@ -188,10 +160,8 @@ MachineModel.new :machine, 'Backup of the local machine\'s configuration' do
     archive.root home_dir
 
     Dir.chdir home_dir
-    Dir.glob('.*history').each do |file|
-      if File.file? file
-        archive.add file
-      end
+    Dir.glob('.*history').select{ |f| File.file?(f) }.each do |file|
+      CustomBackup.archive_path(archive: archive, path: file)
     end
   end
 
