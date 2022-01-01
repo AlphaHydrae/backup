@@ -1,5 +1,7 @@
+# https://git-scm.com/docs/gitignore
 /.data
 /.env*
 /.tmp
 /local
 /log
+/vendor
